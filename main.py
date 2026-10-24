@@ -8,7 +8,8 @@ from cachetools import TTLCache
 import redis.asyncio as redis
 
 from empi import EMPIEngine
-from semantics import SemanticRulesEngine, violates_privacy_consent
+from fastapi.responses import JSONResponse
+from semantics import SemanticRulesEngine, violates_privacy_consent, evaluate_provenance
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
@@ -26,16 +27,32 @@ empi = EMPIEngine(match_threshold=0.85, review_threshold=0.60)
 semantics = SemanticRulesEngine()
 
 # Connect to our new Dockerized Redis
+
 redis_client = redis.Redis(host="localhost", port=6379, decode_responses=True)
 patient_cache = TTLCache(maxsize=1, ttl=60.0)
+http_client: httpx.AsyncClient = None  # New global client
 
 
-async def fetch_existing_patients(client: httpx.AsyncClient) -> list:
+@app.on_event("startup")
+async def startup_event():
+    """Launch background worker and initialize persistent HTTP connection."""
+    global http_client
+    http_client = httpx.AsyncClient(timeout=30.0)
+    asyncio.create_task(redis_worker())
+
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Gracefully close the HTTP connection pool."""
+    await http_client.aclose()
+
+
+async def fetch_existing_patients() -> list:
     """Queries downstream HAPI FHIR with a 60-second TTL cache."""
     if "population" in patient_cache:
         return patient_cache["population"]
     try:
-        res = await client.get(f"{TARGET_FHIR_SERVER}/Patient?_count=50")
+        res = await http_client.get(f"{TARGET_FHIR_SERVER}/Patient?_count=50")
         if res.status_code == 200:
             patients = [
                 e.get("resource")
@@ -49,33 +66,61 @@ async def fetch_existing_patients(client: httpx.AsyncClient) -> list:
     return []
 
 
+# Temporary mock DB for testing provenance routing
+mock_db = {
+    "obs-hemoglobin-001": {
+        "resourceType": "Observation",
+        "meta": {
+            "source": "https://abdm.gov.in/facility/core-lab",
+            "lastUpdated": "2026-10-24T09:00:00Z",
+        },
+    }
+}
+
+
+@app.post("/Observation")
+async def ingress_observation(payload: dict):
+    obs_id = payload.get("id")
+
+    # In production, this would use httpx to fetch from TARGET_FHIR_SERVER
+    existing_record = mock_db.get(obs_id, {})
+
+    if existing_record:
+        prov_check = evaluate_provenance(payload, existing_record)
+        if prov_check["status_code"] == 409:
+            return JSONResponse(status_code=409, content=prov_check["response"])
+
+    # If no conflict, route to downstream server (simulated here)
+    mock_db[obs_id] = payload
+    return JSONResponse(status_code=202, content={"status": "Accepted", "id": obs_id})
+
+
 async def redis_worker():
     """Background task that trickles validated payloads from Redis to HAPI FHIR."""
     logger.info(
         "🚀 Background Redis worker started. Listening for validated FHIR payloads..."
     )
-    async with httpx.AsyncClient(timeout=30.0) as client:
-        while True:
-            try:
-                # Block until a payload enters the queue (timeout 1s to allow graceful shutdown checks)
-                result = await redis_client.blpop("fhir_write_queue", timeout=1)
-                if result:
-                    _, payload_str = result
-                    task_data = json.loads(payload_str)
-                    resource_type = task_data["resourceType"]
-                    payload = task_data["payload"]
+    while True:
+        try:
+            # Block until a payload enters the queue (timeout 1s to allow graceful shutdown checks)
+            result = await redis_client.blpop("fhir_write_queue", timeout=1)
+            if result:
+                _, payload_str = result
+                task_data = json.loads(payload_str)
+                resource_type = task_data["resourceType"]
+                payload = task_data["payload"]
 
-                    upstream_url = f"{TARGET_FHIR_SERVER}/{resource_type}"
-                    await client.post(
-                        upstream_url,
-                        json=payload,
-                        headers={"Content-Type": "application/fhir+json"},
-                    )
-                    # Add a 50ms buffer between database writes to prevent HAPI Hibernate crashes
-                    await asyncio.sleep(0.05)
-            except Exception as e:
-                logger.error(f"Worker ingestion error: {e}")
-                await asyncio.sleep(1)
+                upstream_url = f"{TARGET_FHIR_SERVER}/{resource_type}"
+                await http_client.post(
+                    upstream_url,
+                    json=payload,
+                    headers={"Content-Type": "application/fhir+json"},
+                )
+                # Add a 50ms buffer between database writes to prevent HAPI Hibernate crashes
+                await asyncio.sleep(0.05)
+        except Exception as e:
+            logger.error(f"Worker ingestion error: {e}")
+            await asyncio.sleep(1)
 
 
 @app.on_event("startup")
@@ -98,24 +143,27 @@ async def intercept_fhir_post(resource_type: str, request: Request):
     # STAGE 2: EMPI Identity Resolution (Patient Gate)
     # =========================================================
     if resource_type == "Patient":
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            existing_records = await fetch_existing_patients(client)
-            resolution = empi.evaluate_candidate(payload, existing_records)
+        existing_records = await fetch_existing_patients()
 
-            if resolution["decision"] in ["EXACT_MATCH", "PROBABILISTIC_DUPLICATE"]:
-                return JSONResponse(
-                    status_code=409,
-                    content={
-                        "resourceType": "OperationOutcome",
-                        "issue": [
-                            {
-                                "severity": "error",
-                                "code": "duplicate",
-                                "diagnostics": "Identity Governance Rejection: Duplicate identity detected.",
-                            }
-                        ],
-                    },
-                )
+        # Offload heavy deterministic/probabilistic matching to a background thread
+        resolution = await asyncio.to_thread(
+            empi.evaluate_candidate, payload, existing_records
+        )
+
+        if resolution["decision"] in ["EXACT_MATCH", "PROBABILISTIC_DUPLICATE"]:
+            return JSONResponse(
+                status_code=409,
+                content={
+                    "resourceType": "OperationOutcome",
+                    "issue": [
+                        {
+                            "severity": "error",
+                            "code": "duplicate",
+                            "diagnostics": "Identity Governance Rejection: Duplicate identity detected.",
+                        }
+                    ],
+                },
+            )
 
     # =========================================================
     # STAGE 3: Semantic Plausibility & CDS (Observation Gate)

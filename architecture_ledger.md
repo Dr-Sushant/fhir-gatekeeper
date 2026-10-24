@@ -19,3 +19,10 @@ Handles data collisions when multiple sources submit updates for the same clinic
 * **Higher/Equal Tier Overwrite:** Allowed. If tiers are equal, the system uses `meta.lastUpdated` as a temporal tie-breaker (newer timestamp wins).
 * **Lower Tier Rejection (Data Regression Prevention):** If a lower-tier source attempts to overwrite a higher-tier record, the proxy blocks the transaction.
 * **Active Flagging:** Instead of silently dropping the payload, the interceptor returns an **HTTP 409 Conflict** accompanied by a FHIR `OperationOutcome` resource. This explicitly forces the downstream system to submit the data as a brand-new, distinct `Observation` rather than overwriting the authoritative record.
+
+## 4. Local Testbench & Containerization
+* Orchestrated via `docker-compose.yml` to run the local FHIR server backend (e.g., HAPI/Medplum) and PostgreSQL for quarantined payload logging without polluting the host machine.
+
+## 5. Chaos Benchmarking & Evaluation
+* **Resilience Testing:** `chaos_benchmarker.py` serves as the test suite to evaluate proxy throughput, latency, and stability under simulated API load and payload anomalies.
+* **Isolated Mock Data:** Test payloads are strictly isolated in the `mock_data/` directory to prevent cluttering the core Python logic. Routing rules are validated via independent scripts like `test_provenance.py` rather than directly in the API.

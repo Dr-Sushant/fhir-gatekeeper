@@ -1,0 +1,55 @@
+version: '3.8'
+
+services:
+  # Downstream FHIR Destination
+  hapi-fhir:
+    image: hapiproject/hapi:latest
+    container_name: gatekeeper-hapi-target
+    restart: on-failure
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_DATASOURCE_URL: "jdbc:postgresql://gatekeeper-quarantine:5432/fhir_quarantine"
+      SPRING_DATASOURCE_USERNAME: "governance_admin"
+      SPRING_DATASOURCE_PASSWORD: "securepassword123"
+      SPRING_DATASOURCE_DRIVER_CLASS_NAME: "org.postgresql.Driver"
+      HIBERNATE_DIALECT: "ca.uhn.fhir.jpa.model.dialect.HapiFhirPostgresDialect"
+    depends_on:
+      quarantine-db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/fhir/metadata || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # PostgreSQL for Quarantine & Audit Logging
+  quarantine-db:
+    image: postgres:15-alpine
+    container_name: gatekeeper-quarantine
+    restart: always
+    environment:
+      POSTGRES_USER: "governance_admin"
+      POSTGRES_PASSWORD: "securepassword123"
+      POSTGRES_DB: "fhir_quarantine"
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "sh -c 'pg_isready -U governance_admin -d fhir_quarantine' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      start_period: 5s
+      retries: 5
+    volumes:
+      - gatekeeper_pgdata:/var/lib/postgresql/data
+
+  # Redis for Asynchronous Message Queue
+  redis-queue:
+    image: redis:7-alpine
+    container_name: gatekeeper-redis
+    restart: always
+    ports:
+      - "6379:6379"
+
+volumes:
+  gatekeeper_pgdata:

@@ -26,3 +26,4 @@ Handles data collisions when multiple sources submit updates for the same clinic
 ## 5. Chaos Benchmarking & Evaluation
 * **Resilience Testing:** `chaos_benchmarker.py` serves as the test suite to evaluate proxy throughput, latency, and stability under simulated API load and payload anomalies.
 * **Isolated Mock Data:** Test payloads are strictly isolated in the `mock_data/` directory to prevent cluttering the core Python logic. Routing rules are validated via independent scripts like `test_provenance.py` rather than directly in the API.
+* **Concurrency Optimization:** CPU-bound tasks (like probabilistic EMPI matching or heavy semantic validation) must be wrapped in `asyncio.to_thread()` to prevent freezing the FastAPI asynchronous event loop.

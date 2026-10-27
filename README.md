@@ -1,5 +1,7 @@
 # FHIR Gatekeeper
 
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23600298.svg)](https://doi.org/10.5281/zenodo.23600298)
+
 A high-performance clinical data governance and semantic interceptor middleware built with FastAPI, Redis, and Python. This service acts as a reverse proxy in front of clinical data lakes (e.g., HAPI FHIR), intercepting payloads to enforce strict identity resolution, semantic provenance, and enterprise privacy consent before data persistence.
 
 ## Core Capabilities

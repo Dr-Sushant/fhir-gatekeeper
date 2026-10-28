@@ -6,6 +6,8 @@ A high-performance clinical data governance and semantic interceptor middleware 
 
 ## Core Capabilities
 
+![FHIR Gatekeeper Architecture](assets/architecture.png)
+
 * **Identity Governance (EMPI):** Probabilistic and deterministic patient matching (powered by DuckDB) that intercepts and rejects duplicate identities with HTTP 409 Conflicts.
 * **Semantic Provenance Matrix:** Enforces authoritative data hierarchy (e.g., Core Lab > Pharmacy > Patient App) to prevent lower-tier systems from silently overwriting critical clinical observations.
 * **Asynchronous Trickle Queue:** Uses Redis to buffer validated payloads, decoupling the high-speed proxy from the slower downstream FHIR database to prevent connection timeouts and Hibernate crashes.

@@ -1,0 +1,24 @@
+{
+    "resourceType": "Observation",
+    "id": "obs-hemoglobin-002",
+    "meta": {
+        "source": "https://abdm.gov.in/facility/pharmacy",
+        "lastUpdated": "2026-10-24T14:30:00Z"
+    },
+    "status": "final",
+    "subject": {
+        "reference": "Patient/ABHA-12345"
+    },
+    "code": {
+        "coding": [
+            {
+                "system": "http://loinc.org",
+                "code": "718-7"
+            }
+        ]
+    },
+    "valueQuantity": {
+        "value": 12.8,
+        "unit": "g/dL"
+    }
+}

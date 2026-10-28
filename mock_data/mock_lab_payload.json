@@ -1,0 +1,25 @@
+{
+    "resourceType": "Observation",
+    "id": "obs-hemoglobin-001",
+    "meta": {
+        "source": "https://abdm.gov.in/facility/core-lab",
+        "lastUpdated": "2026-10-24T09:00:00Z"
+    },
+    "status": "final",
+    "subject": {
+        "reference": "Patient/ABHA-12345"
+    },
+    "code": {
+        "coding": [
+            {
+                "system": "http://loinc.org",
+                "code": "718-7",
+                "display": "Hemoglobin [Mass/volume] in Blood"
+            }
+        ]
+    },
+    "valueQuantity": {
+        "value": 14.2,
+        "unit": "g/dL"
+    }
+}

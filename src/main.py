@@ -7,9 +7,9 @@ import httpx
 from cachetools import TTLCache
 import redis.asyncio as redis
 
-from empi import EMPIEngine
+from src.empi import EMPIEngine
 from fastapi.responses import JSONResponse
-from semantics import SemanticRulesEngine, violates_privacy_consent, evaluate_provenance
+from src.semantics import SemanticRulesEngine, violates_privacy_consent, evaluate_provenance
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"

@@ -51,5 +51,20 @@ services:
     ports:
       - "6379:6379"
 
+  # OMOP CDM Analytical Warehouse
+  omop-db:
+    image: postgres:15
+    container_name: gatekeeper-omop-warehouse
+    environment:
+      POSTGRES_USER: omop_admin
+      POSTGRES_PASSWORD: omop_password
+      POSTGRES_DB: omop_cdm
+    ports:
+      - "5433:5432" 
+    volumes:
+      - omop_data:/var/lib/postgresql/data
+      - ./OMOPCDM_postgresql_5.4_ddl.sql:/docker-entrypoint-initdb.d/init.sql
+      
 volumes:
   gatekeeper_pgdata:
+  omop_data:

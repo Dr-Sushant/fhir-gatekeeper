@@ -1,0 +1,22 @@
+{
+    "resourceType": "MedicationRequest",
+    "id": "med-aspirin-001",
+    "meta": {
+        "source": "https://abdm.gov.in/facility/ehr"
+    },
+    "status": "active",
+    "intent": "order",
+    "subject": {
+        "reference": "Patient/ABHA-12345"
+    },
+    "medicationCodeableConcept": {
+        "coding": [
+            {
+                "system": "http://www.nlm.nih.gov/research/umls/rxnorm",
+                "code": "1191",
+                "display": "Aspirin"
+            }
+        ]
+    },
+    "authoredOn": "2026-10-25T11:00:00Z"
+}

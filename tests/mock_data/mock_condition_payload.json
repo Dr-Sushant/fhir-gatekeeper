@@ -1,0 +1,28 @@
+{
+    "resourceType": "Condition",
+    "id": "cond-t2dm-001",
+    "meta": {
+        "source": "https://abdm.gov.in/facility/ehr"
+    },
+    "clinicalStatus": {
+        "coding": [
+            {
+                "system": "http://terminology.hl7.org/CodeSystem/condition-clinical",
+                "code": "active"
+            }
+        ]
+    },
+    "subject": {
+        "reference": "Patient/ABHA-12345"
+    },
+    "code": {
+        "coding": [
+            {
+                "system": "http://hl7.org/fhir/sid/icd-10",
+                "code": "E11.9",
+                "display": "Type 2 diabetes mellitus without complications"
+            }
+        ]
+    },
+    "recordedDate": "2026-10-20T08:30:00Z"
+}
